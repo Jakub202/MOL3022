@@ -67,7 +67,7 @@ def calculate_cleavage_site_metrics_by_type(
     true_cleavage,
     pred_cleavage,
     kingdoms,
-    max_distance=4,
+    max_distance=6,
 ):
     """
     Calculate precision and recall for cleavage site prediction by SP type and kingdom
@@ -391,10 +391,20 @@ def benchmark_model(benchmark_file, model_path, output_dir="results", max_length
     pred_sp_class_idx = predictions["sp_class_indices"]
     pred_cleavage = predictions["cleavage_positions"]
 
-    # Calculate classification metrics
+    # Calculate classification metrics  
     print("\nCalculating metrics...")
     cm = confusion_matrix(true_has_sp, pred_has_sp)
-    mcc = matthews_corrcoef(true_has_sp, pred_has_sp)
+
+    # Calculate MCC1 and MCC2
+    mcc_metrics = calculate_mcc1_mcc2(
+        true_has_sp,
+        pred_has_sp,
+        true_sp_class_idx,
+        pred_sp_class_idx,
+        kingdom_indices
+    )
+
+    
 
     # Calculate SP class accuracy (only for sequences with SP)
     sp_mask = true_has_sp == 1
@@ -418,7 +428,9 @@ def benchmark_model(benchmark_file, model_path, output_dir="results", max_length
 
     # Print results
     print("\nBenchmark Results:")
-    print(f"Matthews Correlation Coefficient: {mcc:.4f}")
+    
+    # Print MCC results
+    print_mcc_results(mcc_metrics, kingdom_indices, true_has_sp, pred_has_sp)
     print(f"SP Class Accuracy (for sequences with SP): {sp_class_accuracy:.4f}")
     print("\nConfusion Matrix:")
     print(cm)
@@ -464,7 +476,6 @@ def benchmark_model(benchmark_file, model_path, output_dir="results", max_length
 
     # Return metrics
     return {
-        "mcc": mcc,
         "confusion_matrix": cm,
         "sp_class_accuracy": sp_class_accuracy,
         "cleavage_metrics_by_type": cs_metrics_by_type,
@@ -509,3 +520,140 @@ if __name__ == "__main__":
             output_dir=args.output_dir,
             max_length=args.max_length,
         )
+
+
+def calculate_mcc1_mcc2(true_has_sp, pred_has_sp, true_sp_class_idx, pred_sp_class_idx, kingdoms):
+    """
+    Calculate MCC1 and MCC2 metrics for each kingdom as a whole
+    
+    Args:
+        true_has_sp: True SP presence (binary)
+        pred_has_sp: Predicted SP presence (binary)
+        true_sp_class_idx: True SP class indices
+        pred_sp_classes: Predicted SP class indices
+        kingdoms: Kingdom indices for each sequence
+        
+    Returns:
+        Dictionary with MCC1 and MCC2 values for each kingdom
+    """
+    # Initialize result dictionaries
+    mcc1_by_kingdom = {}
+    mcc2_by_kingdom = {}
+    
+    # For each kingdom
+    for kingdom_idx in range(4):  # 0=Archaea, 1=Eukarya, 2=Gram-negative, 3=Gram-positive
+        # Filter sequences for this kingdom
+        kingdom_mask = np.array(kingdoms) == kingdom_idx
+        kingdom_indices = np.where(kingdom_mask)[0]
+        
+        if len(kingdom_indices) == 0:
+            continue
+            
+        # Extract kingdom-specific data
+        k_true_has_sp = true_has_sp[kingdom_mask]
+        k_pred_has_sp = pred_has_sp[kingdom_mask]
+        k_true_sp_idx = true_sp_class_idx[kingdom_mask]
+        k_pred_sp_idx = pred_sp_class_idx[kingdom_mask]
+        
+        # MCC1: Sec/SPI vs (Globular + TM)
+        # For MCC1: Only consider sequences that are Sec/SPI (true_sp_idx == 0) or non-SP
+        mcc1_mask = np.zeros_like(k_true_has_sp, dtype=bool)
+        for i in range(len(k_true_has_sp)):
+            # Include SP sequences that are Sec/SPI
+            if k_true_has_sp[i] == 1 and k_true_sp_idx[i] == 0:
+                mcc1_mask[i] = True
+            # Include all non-SP sequences
+            elif k_true_has_sp[i] == 0:
+                mcc1_mask[i] = True
+        
+        # If we have enough samples for valid MCC calculation
+        if np.sum(mcc1_mask) > 0 and np.any(k_true_has_sp[mcc1_mask] == 1) and np.any(k_true_has_sp[mcc1_mask] == 0):
+            # Binary true and predicted labels for Sec/SPI vs non-SP
+            mcc1_true_binary = np.zeros(np.sum(mcc1_mask), dtype=int)
+            mcc1_pred_binary = np.zeros(np.sum(mcc1_mask), dtype=int)
+            
+            # Set 1 for Sec/SPI, 0 for non-SP
+            mcc1_idx = 0
+            for i in range(len(k_true_has_sp)):
+                if mcc1_mask[i]:
+                    # True is 1 if it's Sec/SPI, 0 otherwise
+                    mcc1_true_binary[mcc1_idx] = 1 if (k_true_has_sp[i] == 1 and k_true_sp_idx[i] == 0) else 0
+                    # Pred is 1 if it's predicted as Sec/SPI, 0 otherwise
+                    mcc1_pred_binary[mcc1_idx] = 1 if (k_pred_has_sp[i] == 1 and k_pred_sp_idx[i] == 0) else 0
+                    mcc1_idx += 1
+            
+            # Calculate MCC1
+            mcc1 = matthews_corrcoef(mcc1_true_binary, mcc1_pred_binary)
+            mcc1_by_kingdom[kingdom_idx] = mcc1
+        
+        # MCC2: Sec/SPI vs (other SP types + non-SP)
+        # For MCC2: Consider all sequences
+        if len(k_true_has_sp) > 0 and np.any(k_true_has_sp == 1) and np.any(k_true_has_sp == 0):
+            # Binary true and predicted labels for Sec/SPI vs others
+            mcc2_true_binary = np.zeros_like(k_true_has_sp, dtype=int)
+            mcc2_pred_binary = np.zeros_like(k_pred_has_sp, dtype=int)
+            
+            # Set 1 for Sec/SPI, 0 for other SP types and non-SP
+            for i in range(len(k_true_has_sp)):
+                # True is 1 if it's Sec/SPI, 0 otherwise
+                mcc2_true_binary[i] = 1 if (k_true_has_sp[i] == 1 and k_true_sp_idx[i] == 0) else 0
+                # Pred is 1 if it's predicted as Sec/SPI, 0 otherwise
+                mcc2_pred_binary[i] = 1 if (k_pred_has_sp[i] == 1 and k_pred_sp_idx[i] == 0) else 0
+            
+            # Calculate MCC2
+            mcc2 = matthews_corrcoef(mcc2_true_binary, mcc2_pred_binary)
+            mcc2_by_kingdom[kingdom_idx] = mcc2
+    
+    return {"mcc1": mcc1_by_kingdom, "mcc2": mcc2_by_kingdom}
+
+
+def print_mcc_results(mcc_metrics, kingdom_indices, true_has_sp, pred_has_sp):
+    """
+    Print MCC1 and MCC2 metrics for each kingdom in a formatted table
+    
+    Args:
+        mcc_metrics: Dictionary with MCC1 and MCC2 values from calculate_mcc1_mcc2
+        kingdom_indices: Array with kingdom indices for each sequence
+        true_has_sp: True SP presence (binary)
+        pred_has_sp: Predicted SP presence (binary)
+    """
+    # Calculate regular MCC for Eukarya
+    eukarya_mask = kingdom_indices == 1  # 1 = Eukarya
+    if np.any(eukarya_mask):
+        eukarya_mcc = matthews_corrcoef(true_has_sp[eukarya_mask], pred_has_sp[eukarya_mask])
+    else:
+        eukarya_mcc = float('nan')
+    
+    # Print header
+    print("\nMCC Results:")
+    print("-" * 80)
+    print(f"{'Kingdom':<15} | {'MCC¹':<10} | {'MCC²':<10} | {'MCC':<10}")
+    print("-" * 80)
+    
+    # Print results for each kingdom
+    kingdom_names = {
+        0: "Archaea",
+        1: "Eukarya",
+        2: "Gram-negative",
+        3: "Gram-positive"
+    }
+    
+    for kingdom_idx in range(4):
+        kingdom_name = kingdom_names[kingdom_idx]
+        mcc1 = mcc_metrics["mcc1"].get(kingdom_idx, float('nan'))
+        mcc2 = mcc_metrics["mcc2"].get(kingdom_idx, float('nan'))
+        
+        # For Eukarya, use the regular MCC
+        if kingdom_idx == 1:
+            mcc = eukarya_mcc
+            mcc1_str = "-"
+            mcc2_str = "-"
+            mcc_str = f"{mcc:.4f}" if not np.isnan(mcc) else "N/A"
+        else:
+            mcc1_str = f"{mcc1:.4f}" if not np.isnan(mcc1) else "N/A"
+            mcc2_str = f"{mcc2:.4f}" if not np.isnan(mcc2) else "N/A"
+            mcc_str = "-"
+        
+        print(f"{kingdom_name:<15} | {mcc1_str:<10} | {mcc2_str:<10} | {mcc_str:<10}")
+    
+    print("-" * 80)

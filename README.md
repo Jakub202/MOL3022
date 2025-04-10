@@ -53,12 +53,10 @@ To train the signal peptide prediction model:
 python app/main.py train
 ```
 
-The model uses training data from `data/signal_peptide_train.fasta` and saves the trained model to the `models` directory.
-
-Training parameters can be modified in `app/model.py`:
+Training parameters are defined in `app/model.py`:
 - Maximum sequence length: 100
 - Batch size: 32
-- Epochs: 100
+- Epochs: 100 (with early stopping)
 - Validation split: 0.2
 
 ### Benchmarking Model
@@ -69,7 +67,7 @@ To evaluate the model on a benchmark dataset:
 python app/main.py benchmark
 ```
 
-The benchmark uses test data from `data/signal_peptide_benchmark.fasta` and saves results to the `results` directory.
+The benchmark evaluates the model's performance on test data from `data/benchmark.fasta` and saves results to the `output/results` directory.
 
 ### Making Predictions
 
@@ -79,25 +77,31 @@ To predict signal peptides in new protein sequences:
 python app/main.py predict <path-to-fasta-file>
 ```
 
-Replace `<path-to-fasta-file>` with the path to your FASTA file containing protein sequences.
+Replace `<path-to-fasta-file>` with the path to your FASTA file containing protein sequences (example: `predict.fasta`).
 
 ## Data Format
 
 ### Input Files
-- Training data: `data/signal_peptide_train.fasta`
-- Benchmark data: `data/signal_peptide_benchmark.fasta`
+- Training data: `data/train6.fasta`
+- Benchmark data: `data/benchmark.fasta`
 - Prediction input: Any properly formatted FASTA file
 
 ### Output Files
 - Trained model: `models/sp_model_best.keras`
-- Benchmark results: `results/benchmark_metrics.txt`, `results/confusion_matrix.png`, etc.
-- Prediction results: Displayed in the console and saved to specified output file if provided
+- Benchmark results: `output/results/benchmark_results.csv` and metrics visualizations
+- Prediction results: Displayed in console and optionally saved to file
 
 ## Model Architecture
 
 The model employs a multi-task learning approach with three outputs:
 - Binary cross-entropy for signal peptide presence prediction
 - Categorical cross-entropy for signal peptide class prediction
-- Custom masked MSE loss for cleavage site prediction, which ignores examples without signal peptide
+- Custom masked MSE loss for cleavage site prediction, which ignores examples without signal peptides
+
+Signal peptide cleavage positions are constrained to biologically plausible ranges based on the signal peptide type:
+- Sec/SPI (class 0): positions 15-35
+- Tat/SPI (class 1): positions 20-40
+- Sec/SPII (class 2): positions 15-30
+- Sec/SPIII (class 3): positions 15-30
 
 

@@ -25,7 +25,7 @@ OUTPUT_DIR = os.path.join(
 MODEL_DIR = os.path.join(OUTPUT_DIR, "models")
 RESULTS_DIR = os.path.join(OUTPUT_DIR, "results")
 DEFAULT_MODEL_PATH = os.path.join(MODEL_DIR, "sp_model.keras")
-TRAIN_FASTA = "train.fasta"
+TRAIN_FASTA = "train6.fasta"
 BENCHMARK_FASTA = "benchmark.fasta"
 
 # Constants

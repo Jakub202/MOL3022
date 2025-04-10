@@ -646,7 +646,7 @@ if __name__ == "__main__":
         description="Train signal peptide prediction model"
     )
     parser.add_argument(
-        "--train-fasta", default="data/train.fasta", help="Path to training FASTA file"
+        "--train-fasta", default="data/train6.fasta", help="Path to training FASTA file"
     )
     parser.add_argument(
         "--max-length", type=int, default=100, help="Maximum sequence length"

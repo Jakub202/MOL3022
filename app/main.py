@@ -25,13 +25,13 @@ OUTPUT_DIR = os.path.join(
 MODEL_DIR = os.path.join(OUTPUT_DIR, "models")
 RESULTS_DIR = os.path.join(OUTPUT_DIR, "results")
 DEFAULT_MODEL_PATH = os.path.join(MODEL_DIR, "sp_model.keras")
-TRAIN_FASTA = "train6.fasta"
+TRAIN_FASTA = "train5.fasta"
 BENCHMARK_FASTA = "benchmark.fasta"
 
 # Constants
 MAX_LENGTH = 100
 BATCH_SIZE = 32
-EPOCHS = 20
+EPOCHS = 35
 
 
 def train(args):

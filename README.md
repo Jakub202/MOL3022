@@ -14,6 +14,20 @@ The model architecture combines convolutional neural networks (CNNs) and bidirec
 
 ## Installation
 
+### Virtual Environment Setup
+It's recommended to use a virtual environment:
+
+```bash
+# Create virtual environment
+python -m venv venv
+
+# Activate the virtual environment
+# On Linux/Mac:
+source venv/bin/activate
+# On Windows:
+venv\Scripts\activate
+```
+
 ### Requirements
 - Python 3.6+
 - TensorFlow 2.x
@@ -36,57 +50,54 @@ pip install tensorflow numpy pandas matplotlib scikit-learn seaborn
 To train the signal peptide prediction model:
 
 ```bash
-python app/model.py --train-fasta data/signal_peptide_train.fasta --model-path models --epochs 100
+python app/main.py train
 ```
 
-Options:
-- `--train-fasta`: Path to the training FASTA file
-- `--max-length`: Maximum sequence length (default: 100)
-- `--batch-size`: Training batch size (default: 32)
-- `--epochs`: Number of training epochs (default: 100)
-- `--model-path`: Directory to save model (default: 'models')
+The model uses training data from `data/signal_peptide_train.fasta` and saves the trained model to the `models` directory.
+
+Training parameters can be modified in `app/model.py`:
+- Maximum sequence length: 100
+- Batch size: 32
+- Epochs: 100
+- Validation split: 0.2
 
 ### Benchmarking Model
 
 To evaluate the model on a benchmark dataset:
 
 ```bash
-python app/benchmark.py --benchmark-fasta data/signal_peptide_benchmark.fasta --model models/sp_model.keras --output-dir results
+python app/main.py benchmark
 ```
 
-Options:
-- `--benchmark-fasta`: Path to benchmark FASTA file
-- `--model`: Path to trained model
-- `--output-dir`: Directory to save benchmark results
+The benchmark uses test data from `data/signal_peptide_benchmark.fasta` and saves results to the `results` directory.
 
 ### Making Predictions
 
-#### From a FASTA File
+To predict signal peptides in new protein sequences:
 
 ```bash
-python app/predict.py --fasta your_sequences.fasta --model models/sp_model.keras --output predictions.csv
+python app/main.py predict <path-to-fasta-file>
 ```
 
-Options:
-- `--fasta`: Path to FASTA file with sequences
-- `--model`: Path to trained model
-- `--output`: Path to save prediction results (optional)
-
-#### For a Single Sequence
-
-```bash
-python app/predict.py --sequence "MLLSVPLLLGLLGLAVASNPVFA" --kingdom "EUKARYA" --name "MyProtein" --model models/sp_model.keras
-```
-
-Options:
-- `--sequence`: The amino acid sequence to analyze
-- `--kingdom`: Kingdom information (Archaea, EUKARYA, bacteria-negative, bacteria-positive)
-- `--name`: Name for the sequence (default: "Query")
-- `--model`: Path to trained model
-- `--output`: Path to save prediction results (optional)
+Replace `<path-to-fasta-file>` with the path to your FASTA file containing protein sequences.
 
 ## Data Format
 
-The tool expects FASTA files with the following format:
+### Input Files
+- Training data: `data/signal_peptide_train.fasta`
+- Benchmark data: `data/signal_peptide_benchmark.fasta`
+- Prediction input: Any properly formatted FASTA file
+
+### Output Files
+- Trained model: `models/sp_model_best.keras`
+- Benchmark results: `results/benchmark_metrics.txt`, `results/confusion_matrix.png`, etc.
+- Prediction results: Displayed in the console and saved to specified output file if provided
+
+## Model Architecture
+
+The model employs a multi-task learning approach with three outputs:
+- Binary cross-entropy for signal peptide presence prediction
+- Categorical cross-entropy for signal peptide class prediction
+- Custom masked MSE loss for cleavage site prediction, which ignores examples without signal peptide
 
 

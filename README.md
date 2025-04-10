@@ -40,7 +40,7 @@ venv\Scripts\activate
 Install dependencies with:
 
 ```bash
-pip install tensorflow numpy pandas matplotlib scikit-learn seaborn
+pip install -r requirements.txt
 ```
 
 ## Usage
@@ -97,11 +97,5 @@ The model employs a multi-task learning approach with three outputs:
 - Binary cross-entropy for signal peptide presence prediction
 - Categorical cross-entropy for signal peptide class prediction
 - Custom masked MSE loss for cleavage site prediction, which ignores examples without signal peptides
-
-Signal peptide cleavage positions are constrained to biologically plausible ranges based on the signal peptide type:
-- Sec/SPI (class 0): positions 15-35
-- Tat/SPI (class 1): positions 20-40
-- Sec/SPII (class 2): positions 15-30
-- Sec/SPIII (class 3): positions 15-30
 
 
